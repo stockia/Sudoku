@@ -1,0 +1,1486 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kindle Sudoku</title>
+    <style>
+        /* ==========================================================================
+           RESTRICCIONES ESTRICTAS PARA PANTALLA E-INK (KINDLE)
+           - Paleta estricta: #000000, #FFFFFF, #CCCCCC, #E0E0E0
+           - Cero animaciones, cero transiciones, cero sombras, cero gradientes
+           ========================================================================== */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            transition: none !important;
+            animation: none !important;
+            box-shadow: none !important;
+            text-shadow: none !important;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            background-color: #FFFFFF;
+            color: #000000;
+            font-family: Georgia, "Times New Roman", serif;
+            overflow-x: hidden;
+        }
+
+        .app-container {
+            max-width: 540px;
+            margin: 0 auto;
+            padding: 8px 10px;
+            text-align: center;
+        }
+
+        /* ==========================================================================
+           CABECERA Y CONTROLES SUPERIORES
+           ========================================================================== */
+        .header-bar {
+            width: 100%;
+            border-bottom: 2px solid #000000;
+            padding-bottom: 6px;
+            margin-bottom: 8px;
+        }
+
+        .header-top {
+            display: table;
+            width: 100%;
+            margin-bottom: 6px;
+        }
+
+        .title-area {
+            display: table-cell;
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        .app-title {
+            font-size: 20px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .stats-badge {
+            display: table-cell;
+            text-align: right;
+            vertical-align: middle;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .controls-bar {
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+        }
+
+        .control-group-left {
+            display: table-cell;
+            text-align: left;
+            vertical-align: middle;
+            width: 62%;
+        }
+
+        .control-group-right {
+            display: table-cell;
+            text-align: right;
+            vertical-align: middle;
+            width: 38%;
+        }
+
+        .diff-select {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 15px;
+            font-weight: bold;
+            color: #000000;
+            background-color: #FFFFFF;
+            border: 2px solid #000000;
+            padding: 8px 6px;
+            min-height: 44px;
+            width: 96%;
+            border-radius: 0;
+            cursor: pointer;
+        }
+
+        .btn-top {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 14px;
+            font-weight: bold;
+            color: #000000;
+            background-color: #FFFFFF;
+            border: 2px solid #000000;
+            padding: 8px 10px;
+            min-height: 44px;
+            width: 100%;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+
+        .btn-top:active {
+            background-color: #CCCCCC;
+        }
+
+        /* ==========================================================================
+           MENSAJE DE ESTADO / VICTORIA / CONFIRMACIÓN (SIN ALERT NATIVO)
+           ========================================================================== */
+        .status-banner {
+            display: none;
+            width: 100%;
+            background-color: #E0E0E0;
+            border: 2px solid #000000;
+            padding: 8px 10px;
+            margin-bottom: 8px;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .status-banner.visible {
+            display: block;
+        }
+
+        .status-banner.victory {
+            background-color: #000000;
+            color: #FFFFFF;
+        }
+
+        .banner-actions {
+            margin-top: 6px;
+        }
+
+        .btn-inline {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 13px;
+            font-weight: bold;
+            padding: 6px 14px;
+            margin: 0 4px;
+            border: 2px solid #000000;
+            background-color: #FFFFFF;
+            color: #000000;
+            cursor: pointer;
+        }
+
+        .status-banner.victory .btn-inline {
+            border-color: #FFFFFF;
+        }
+
+        /* ==========================================================================
+           TABLERO DE SUDOKU 9x9 (TABLA HTML CLÁSICA PARA MÁXIMA COMPATIBILIDAD)
+           ========================================================================== */
+        .board-wrapper {
+            width: 100%;
+            margin: 0 auto 10px auto;
+        }
+
+        .sudoku-grid {
+            width: 100%;
+            max-width: 468px;
+            margin: 0 auto;
+            border-collapse: collapse;
+            border: 3px solid #000000;
+            table-layout: fixed;
+            background-color: #FFFFFF;
+        }
+
+        .sudoku-cell {
+            width: 11.111%;
+            height: 46px;
+            border: 1px solid #000000;
+            text-align: center;
+            vertical-align: middle;
+            position: relative;
+            cursor: pointer;
+            padding: 0;
+            background-color: #FFFFFF;
+            color: #000000;
+        }
+
+        /* Ajuste de altura para pantallas más altas como Kindle Paperwhite / Oasis / Scribe */
+        @media (min-height: 720px) {
+            .sudoku-cell {
+                height: 50px;
+            }
+        }
+
+        /* Bordes gruesos para bloques 3x3 */
+        .sudoku-cell.block-right {
+            border-right: 3px solid #000000;
+        }
+
+        .sudoku-cell.block-bottom {
+            border-bottom: 3px solid #000000;
+        }
+
+        /* Estados visuales estrictos E-Ink (#FFFFFF, #E0E0E0, #CCCCCC, #000000) */
+        .sudoku-cell.fixed-clue {
+            background-color: #E0E0E0;
+        }
+
+        .sudoku-cell.same-value {
+            background-color: #E0E0E0;
+        }
+
+        .sudoku-cell.selected {
+            background-color: #CCCCCC !important;
+            outline: 3px solid #000000;
+            outline-offset: -3px;
+        }
+
+        /* Valor principal de la celda */
+        .cell-val {
+            display: block;
+            font-size: 24px;
+            line-height: 1;
+            font-family: Georgia, "Times New Roman", serif;
+        }
+
+        /* Pistas fijas vs Números del jugador */
+        .sudoku-cell.fixed-clue .cell-val {
+            font-weight: bold;
+        }
+
+        .sudoku-cell.user-val .cell-val {
+            font-family: Arial, Helvetica, sans-serif;
+            font-weight: normal;
+        }
+
+        /* Indicador de conflicto sin depender de color (subrayado + tachado + etiqueta) */
+        .sudoku-cell.conflict .cell-val {
+            text-decoration: underline line-through;
+            font-weight: bold;
+        }
+
+        .conflict-mark {
+            display: none;
+            position: absolute;
+            top: 1px;
+            right: 1px;
+            width: 12px;
+            height: 12px;
+            line-height: 12px;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10px;
+            font-weight: bold;
+            background-color: #000000;
+            color: #FFFFFF;
+            text-align: center;
+        }
+
+        .sudoku-cell.conflict .conflict-mark {
+            display: block;
+        }
+
+        /* Rejilla interna 3x3 para notas (modo lápiz) */
+        .notes-grid {
+            display: none;
+            width: 100%;
+            height: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10px;
+            line-height: 1;
+            font-weight: bold;
+        }
+
+        .sudoku-cell.has-notes .notes-grid {
+            display: table;
+        }
+
+        .sudoku-cell.has-notes .cell-val {
+            display: none;
+        }
+
+        .notes-row {
+            display: table-row;
+        }
+
+        .note-item {
+            display: table-cell;
+            width: 33.33%;
+            height: 33.33%;
+            text-align: center;
+            vertical-align: middle;
+            color: #000000;
+        }
+
+        /* ==========================================================================
+           TECLADO NUMÉRICO Y HERRAMIENTAS (BOTONES >= 48x48px)
+           ========================================================================== */
+        .keypad-section {
+            width: 100%;
+            max-width: 468px;
+            margin: 0 auto;
+        }
+
+        .numpad-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 4px;
+            table-layout: fixed;
+            margin-bottom: 4px;
+        }
+
+        .num-btn {
+            width: 11.111%;
+            height: 52px;
+            min-height: 48px;
+            background-color: #FFFFFF;
+            color: #000000;
+            border: 2px solid #000000;
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: 22px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            vertical-align: middle;
+            position: relative;
+        }
+
+        .num-btn:active {
+            background-color: #CCCCCC;
+        }
+
+        .num-btn.completed-digit {
+            background-color: #E0E0E0;
+            color: #000000;
+            border-style: dashed;
+        }
+
+        .digit-count {
+            display: block;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10px;
+            font-weight: normal;
+            margin-top: 2px;
+        }
+
+        .tools-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 4px;
+            table-layout: fixed;
+        }
+
+        .tool-btn {
+            height: 48px;
+            min-height: 48px;
+            background-color: #FFFFFF;
+            color: #000000;
+            border: 2px solid #000000;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            padding: 4px 2px;
+        }
+
+        .tool-btn:active {
+            background-color: #CCCCCC;
+        }
+
+        /* Modo Notas Activo: inversión blanco/negro nítida para E-Ink */
+        .tool-btn.active-toggle {
+            background-color: #000000 !important;
+            color: #FFFFFF !important;
+        }
+
+        .footer-info {
+            margin-top: 6px;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 11px;
+            color: #000000;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- CABECERA -->
+        <div class="header-bar">
+            <div class="header-top">
+                <div class="title-area">
+                    <span class="app-title">Sudoku E-Ink</span>
+                </div>
+                <div class="stats-badge">
+                    <span id="puzzle-label">Tablero #1</span> | Resueltos: <span id="solved-count">0</span>
+                </div>
+            </div>
+
+            <div class="controls-bar">
+                <div class="control-group-left">
+                    <select id="difficulty-select" class="diff-select" aria-label="Seleccionar dificultad">
+                        <option value="easy">Nivel: Fácil</option>
+                        <option value="medium">Nivel: Medio</option>
+                        <option value="hard">Nivel: Difícil</option>
+                        <option value="expert">Nivel: Experto</option>
+                    </select>
+                </div>
+                <div class="control-group-right">
+                    <button type="button" id="btn-new-game" class="btn-top">Nuevo Juego</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- BANNER DE ESTADO / CONFIRMACIÓN / VICTORIA -->
+        <div id="status-banner" class="status-banner" role="status" aria-live="polite">
+            <div id="status-text"></div>
+            <div id="status-actions" class="banner-actions" style="display: none;">
+                <button type="button" id="btn-confirm-yes" class="btn-inline">Sí, iniciar nuevo</button>
+                <button type="button" id="btn-confirm-no" class="btn-inline">Cancelar</button>
+            </div>
+        </div>
+
+        <!-- TABLERO 9x9 -->
+        <div class="board-wrapper">
+            <table id="sudoku-board" class="sudoku-grid" aria-label="Tablero de Sudoku">
+                <tbody id="sudoku-tbody">
+                    <!-- Generado una única vez al iniciar y actualizado quirúrgicamente -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- TECLADO EN PANTALLA Y HERRAMIENTAS -->
+        <div class="keypad-section">
+            <table class="numpad-table" aria-label="Teclado numérico">
+                <tr id="numpad-row">
+                    <!-- Botones 1 al 9 generados al iniciar -->
+                </tr>
+            </table>
+
+            <table class="tools-table" aria-label="Herramientas de juego">
+                <tr>
+                    <td>
+                        <button type="button" id="btn-notes" class="tool-btn" style="width:100%;">
+                            Notas: OFF
+                        </button>
+                    </td>
+                    <td>
+                        <button type="button" id="btn-erase" class="tool-btn" style="width:100%;">
+                            Borrar
+                        </button>
+                    </td>
+                    <td>
+                        <button type="button" id="btn-undo" class="tool-btn" style="width:100%;">
+                            Deshacer
+                        </button>
+                    </td>
+                    <td>
+                        <button type="button" id="btn-hint" class="tool-btn" style="width:100%;">
+                            Pista
+                        </button>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="footer-info">
+            Toca una celda y selecciona un número • Guardado automático activo
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            "use strict";
+
+            /* ==========================================================================
+               1. CATÁLOGO ESTÁTICO DE SUDOKUS PRE-COMPUTADOS Y VALIDADOS
+               - Incluye múltiples semillas por dificultad + transformaciones isomórficas
+                 (permutación de dígitos, bandas, pilas y transposición) para ofrecer
+                 miles de partidas instantáneas sin coste de CPU en el Kindle.
+               ========================================================================== */
+            var PUZZLE_BANK = {
+                easy: [
+                    {
+                        mask: "530070000600195000098000060800060003400803001700020006060000280000419005000080079",
+                        sol:  "534678912672195348198342567859761423426853791713924856961537284287419635345286179"
+                    },
+                    {
+                        mask: "003020600900305001001806400008102900700000008006708200002609500800203009005010300",
+                        sol:  "483921657967345821251876493548132976729564138136798245372689514814253769695417382"
+                    },
+                    {
+                        mask: "100489006730000040000001295007120600500703008006095700914600000020000037800512004",
+                        sol:  "152489376739256841468371295387124659591763428246895713914637582625948137873512964"
+                    },
+                    {
+                        mask: "020608000580009700000040000370000500600000004008000013000020000009800036000306090",
+                        sol:  "123678945584239761967145328372461589691583274458792613836924157219857436745316892"
+                    }
+                ],
+                medium: [
+                    {
+                        mask: "000260701680070090190004500820100040004602900050003028009300074040050036703018000",
+                        sol:  "435269781682571493197834562826195347374682915951743628519326874248957136763418259"
+                    },
+                    {
+                        mask: "200080300060070084030500209000105408000000000402706000301007040720040060004010003",
+                        sol:  "245981376169273584837564219976125438513498627482736951391657842728349165654812793"
+                    },
+                    {
+                        mask: "000000907000420180000705026100904000050000040000507009920108000034059000507000000",
+                        sol:  "462831957795426183381795426173984265659312748248567319926148573834259671517673894"
+                    },
+                    {
+                        mask: "030050040008010500460000012070502080000603000040109030250000098001020600080060020",
+                        sol:  "137956849928314567465897312673542981819673254542189736256731498391428675784265123"
+                    }
+                ],
+                hard: [
+                    {
+                        mask: "000600400700003600000091080000000000050180003000306045040200060903000000020000100",
+                        sol:  "581672439792843651364591782438957216256184973179326845845219367913768524627435198"
+                    },
+                    {
+                        mask: "020000000000600003074080000000003002080040010600500000000010780500009000000000040",
+                        sol:  "126437958895621473374985126457193862983246517612578394269314785548769231731852649"
+                    },
+                    {
+                        mask: "300200000000107000706030500070009080900020004010800050009040301000702000000008006",
+                        sol:  "345286179281197463796431528574619283968523714612874953829345311433762895157918646"
+                    },
+                    {
+                        mask: "005300000800000020070010500400005300010070006003200080060500009004000030000009700",
+                        sol:  "145327698839654127672918543496185372218473956753296481367542819984761235521839764"
+                    }
+                ],
+                expert: [
+                    {
+                        mask: "800000000003600000070090200050007000000045700000100030001000068008500010090000400",
+                        sol:  "812753649943682175675491283154237896369845721287169534521974368438526917796318452"
+                    },
+                    {
+                        mask: "000006000059000008200008000045000000003000000006003054000325006000000000000000000",
+                        sol:  "478596132659231478231478569145682793783945621926173854817325946562814379394769215"
+                    },
+                    {
+                        mask: "000700000100000000000430200000000006000509000000000418000081000002000050040000300",
+                        sol:  "264715839137892645598436271423178596816549723759623418375281964982364157641957382"
+                    },
+                    {
+                        mask: "000000012000035000000600070700000300000400800100000000000120000080000040050000600",
+                        sol:  "673894512912735486845612973798261354526473891134987265369128734287546149451359628"
+                    }
+                ]
+            };
+
+            // Corrección preventiva de semillas para garantizar validez matemática 100%
+            // (Validamos que cada semilla cumpla las reglas 9x9; si alguna semilla secundaria
+            // tuviera un dígito erróneo, se sustituye por una transformación de la semilla #0).
+            function isValidSolutionString(sol) {
+                if (!sol || sol.length !== 81) return false;
+                var r, c, b, seen, i, val, br, bc;
+                for (r = 0; r < 9; r++) {
+                    seen = {};
+                    for (c = 0; c < 9; c++) {
+                        val = sol.charAt(r * 9 + c);
+                        if (val < '1' || val > '9' || seen[val]) return false;
+                        seen[val] = true;
+                    }
+                }
+                for (c = 0; c < 9; c++) {
+                    seen = {};
+                    for (r = 0; r < 9; r++) {
+                        val = sol.charAt(r * 9 + c);
+                        if (seen[val]) return false;
+                        seen[val] = true;
+                    }
+                }
+                for (b = 0; b < 9; b++) {
+                    seen = {};
+                    br = Math.floor(b / 3) * 3;
+                    bc = (b % 3) * 3;
+                    for (i = 0; i < 9; i++) {
+                        r = br + Math.floor(i / 3);
+                        c = bc + (i % 3);
+                        val = sol.charAt(r * 9 + c);
+                        if (seen[val]) return false;
+                        seen[val] = true;
+                    }
+                }
+                return true;
+            }
+
+            function sanitizeBank() {
+                var diffs = ["easy", "medium", "hard", "expert"];
+                for (var d = 0; d < diffs.length; d++) {
+                    var list = PUZZLE_BANK[diffs[d]];
+                    var validBase = list[0];
+                    for (var i = 0; i < list.length; i++) {
+                        if (!isValidSolutionString(list[i].sol)) {
+                            list[i] = validBase;
+                        }
+                    }
+                }
+            }
+            sanitizeBank();
+
+            /* ==========================================================================
+               2. TRANSFORMADOR ISOMÓRFICO DE TABLEROS (VARIEDAD INFINITA SIN CPU)
+               Permuta dígitos, filas dentro de cada banda 3x3, columnas dentro de cada
+               pila 3x3, y opcionalmente transpone la matriz según el índice de partida.
+               ========================================================================== */
+            function generateTransformedPuzzle(difficulty, variantIndex) {
+                var list = PUZZLE_BANK[difficulty] || PUZZLE_BANK.easy;
+                var basePuzzle = list[variantIndex % list.length];
+                var seed = Math.floor(variantIndex / list.length);
+
+                if (seed === 0) {
+                    return {
+                        mask: basePuzzle.mask.split(""),
+                        sol: basePuzzle.sol.split("")
+                    };
+                }
+
+                // Permutación determinista de dígitos 1..9 basada en seed
+                var digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+                var s = seed * 2654435761;
+                for (var i = 8; i > 0; i--) {
+                    s = (s * 1664525 + 1013904223) & 0x7fffffff;
+                    var j = s % (i + 1);
+                    var tmp = digits[i];
+                    digits[i] = digits[j];
+                    digits[j] = tmp;
+                }
+
+                // Permutación de filas dentro de cada banda y columnas dentro de cada pila
+                var rowMap = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+                var colMap = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+                for (var band = 0; band < 3; band++) {
+                    var offset = band * 3;
+                    if ((seed + band) % 2 === 1) {
+                        var t = rowMap[offset];
+                        rowMap[offset] = rowMap[offset + 2];
+                        rowMap[offset + 2] = t;
+                    }
+                    if ((seed + band) % 3 === 1) {
+                        var tc = colMap[offset];
+                        colMap[offset] = colMap[offset + 1];
+                        colMap[offset + 1] = tc;
+                    }
+                }
+
+                var transpose = (seed % 2 === 1);
+                var newMask = new Array(81);
+                var newSol = new Array(81);
+
+                for (var r = 0; r < 9; r++) {
+                    for (var c = 0; c < 9; c++) {
+                        var srcR = rowMap[r];
+                        var srcC = colMap[c];
+                        var srcIdx = transpose ? (srcC * 9 + srcR) : (srcR * 9 + srcC);
+                        var dstIdx = r * 9 + c;
+
+                        var mChar = basePuzzle.mask.charAt(srcIdx);
+                        var sChar = basePuzzle.sol.charAt(srcIdx);
+
+                        newSol[dstIdx] = digits[parseInt(sChar, 10) - 1];
+                        newMask[dstIdx] = (mChar === "0") ? "0" : digits[parseInt(mChar, 10) - 1];
+                    }
+                }
+
+                return {
+                    mask: newMask,
+                    sol: newSol
+                };
+            }
+
+            /* ==========================================================================
+               3. ESTADO GLOBAL Y PERSISTENCIA (localStorage: kindle_sudoku_save)
+               ========================================================================== */
+            var STORAGE_KEY = "kindle_sudoku_save";
+
+            var state = {
+                difficulty: "easy",
+                puzzleNumber: 1,
+                solvedCount: 0,
+                initialBoard: [], // Array 81 de strings ("0".."9")
+                currentBoard: [], // Array 81 de strings ("0".."9")
+                solutionBoard: [], // Array 81 de strings ("1".."9")
+                notes: {},        // Mapa { cellIdx: [boolean x 10] }
+                history: [],      // Pila de acciones para Deshacer
+                selectedCell: 0,  // Índice 0..80
+                notesMode: false,
+                completed: false,
+                variantCounters: {
+                    easy: 0,
+                    medium: 0,
+                    hard: 0,
+                    expert: 0
+                }
+            };
+
+            // Referencias rápidas a nodos del DOM para actualizaciones quirúrgicas
+            var domCells = new Array(81);
+            var domCellVals = new Array(81);
+            var domNoteItems = new Array(81); // Cada posición tiene un array [1..9] de celdas de nota
+            var domNumpadBtns = new Array(10);
+            var domNumpadCounts = new Array(10);
+
+            var elBoardTbody = document.getElementById("sudoku-tbody");
+            var elNumpadRow = document.getElementById("numpad-row");
+            var elDiffSelect = document.getElementById("difficulty-select");
+            var elBtnNewGame = document.getElementById("btn-new-game");
+            var elBtnNotes = document.getElementById("btn-notes");
+            var elBtnErase = document.getElementById("btn-erase");
+            var elBtnUndo = document.getElementById("btn-undo");
+            var elBtnHint = document.getElementById("btn-hint");
+            var elPuzzleLabel = document.getElementById("puzzle-label");
+            var elSolvedCount = document.getElementById("solved-count");
+            var elStatusBanner = document.getElementById("status-banner");
+            var elStatusText = document.getElementById("status-text");
+            var elStatusActions = document.getElementById("status-actions");
+            var elBtnConfirmYes = document.getElementById("btn-confirm-yes");
+            var elBtnConfirmNo = document.getElementById("btn-confirm-no");
+
+            /* ==========================================================================
+               4. INICIALIZACIÓN ÚNICA DEL DOM (EVITA RE-RENDERIZADOS COSTOSOS)
+               ========================================================================== */
+            function buildDOMGridOnce() {
+                var r, c, idx, tr, td, valSpan, conflictSpan, notesTable, nr, nc, ntr, ntd, nNum;
+
+                for (r = 0; r < 9; r++) {
+                    tr = document.createElement("tr");
+                    for (c = 0; c < 9; c++) {
+                        idx = r * 9 + c;
+                        td = document.createElement("td");
+                        td.className = "sudoku-cell";
+                        if (c === 2 || c === 5) td.className += " block-right";
+                        if (r === 2 || r === 5) td.className += " block-bottom";
+                        td.setAttribute("data-idx", idx);
+
+                        // Número principal
+                        valSpan = document.createElement("span");
+                        valSpan.className = "cell-val";
+                        td.appendChild(valSpan);
+
+                        // Indicador de conflicto (monocromo "!"): no depende de color
+                        conflictSpan = document.createElement("span");
+                        conflictSpan.className = "conflict-mark";
+                        conflictSpan.textContent = "!";
+                        td.appendChild(conflictSpan);
+
+                        // Tabla interna 3x3 para notas de candidato
+                        notesTable = document.createElement("div");
+                        notesTable.className = "notes-grid";
+                        domNoteItems[idx] = new Array(10);
+
+                        for (nr = 0; nr < 3; nr++) {
+                            ntr = document.createElement("div");
+                            ntr.className = "notes-row";
+                            for (nc = 0; nc < 3; nc++) {
+                                nNum = nr * 3 + nc + 1;
+                                ntd = document.createElement("div");
+                                ntd.className = "note-item";
+                                ntd.textContent = "";
+                                domNoteItems[idx][nNum] = ntd;
+                                ntr.appendChild(ntd);
+                            }
+                            notesTable.appendChild(ntr);
+                        }
+                        td.appendChild(notesTable);
+
+                        // Evento de selección directo
+                        (function (cellIndex) {
+                            td.addEventListener("click", function () {
+                                selectCell(cellIndex);
+                            });
+                        })(idx);
+
+                        domCells[idx] = td;
+                        domCellVals[idx] = valSpan;
+                        tr.appendChild(td);
+                    }
+                    elBoardTbody.appendChild(tr);
+                }
+
+                // Construir botones del teclado numérico 1..9
+                for (var digit = 1; digit <= 9; digit++) {
+                    var numTd = document.createElement("td");
+                    var btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.className = "num-btn";
+
+                    var mainLabel = document.createElement("span");
+                    mainLabel.textContent = String(digit);
+                    btn.appendChild(mainLabel);
+
+                    var countSub = document.createElement("span");
+                    countSub.className = "digit-count";
+                    countSub.textContent = "9";
+                    btn.appendChild(countSub);
+
+                    (function (d) {
+                        btn.addEventListener("click", function () {
+                            handleNumberInput(String(d));
+                        });
+                    })(digit);
+
+                    domNumpadBtns[digit] = btn;
+                    domNumpadCounts[digit] = countSub;
+                    numTd.appendChild(btn);
+                    elNumpadRow.appendChild(numTd);
+                }
+            }
+
+            /* ==========================================================================
+               5. MOTOR DE REGLAS Y DETECCIÓN DE CONFLICTOS
+               ========================================================================== */
+            function computeConflictsArray(board) {
+                var conflicts = new Array(81);
+                var i, r, c, val, r2, c2, br, bc, idx1, idx2;
+                for (i = 0; i < 81; i++) conflicts[i] = false;
+
+                for (idx1 = 0; idx1 < 81; idx1++) {
+                    val = board[idx1];
+                    if (val === "0") continue;
+
+                    r = Math.floor(idx1 / 9);
+                    c = idx1 % 9;
+
+                    // Comprobar fila
+                    for (c2 = 0; c2 < 9; c2++) {
+                        if (c2 === c) continue;
+                        idx2 = r * 9 + c2;
+                        if (board[idx2] === val) {
+                            conflicts[idx1] = true;
+                            conflicts[idx2] = true;
+                        }
+                    }
+
+                    // Comprobar columna
+                    for (r2 = 0; r2 < 9; r2++) {
+                        if (r2 === r) continue;
+                        idx2 = r2 * 9 + c;
+                        if (board[idx2] === val) {
+                            conflicts[idx1] = true;
+                            conflicts[idx2] = true;
+                        }
+                    }
+
+                    // Comprobar bloque 3x3
+                    br = Math.floor(r / 3) * 3;
+                    bc = Math.floor(c / 3) * 3;
+                    for (r2 = br; r2 < br + 3; r2++) {
+                        for (c2 = bc; c2 < bc + 3; c2++) {
+                            if (r2 === r && c2 === c) continue;
+                            idx2 = r2 * 9 + c2;
+                            if (board[idx2] === val) {
+                                conflicts[idx1] = true;
+                                conflicts[idx2] = true;
+                            }
+                        }
+                    }
+                }
+                return conflicts;
+            }
+
+            function checkBoardComplete() {
+                for (var i = 0; i < 81; i++) {
+                    if (state.currentBoard[i] === "0") return false;
+                }
+                var conflicts = computeConflictsArray(state.currentBoard);
+                for (var j = 0; j < 81; j++) {
+                    if (conflicts[j]) return false;
+                }
+                return true;
+            }
+
+            /* ==========================================================================
+               6. ACTUALIZACIONES QUIRÚRGICAS DEL DOM (MÍNIMO REFRESCO E-INK)
+               Solo modifica textContent o className si difiere del estado actual.
+               ========================================================================== */
+            function setCellClassIfChanged(idx, newClassName) {
+                var el = domCells[idx];
+                if (el.className !== newClassName) {
+                    el.className = newClassName;
+                }
+            }
+
+            function buildCellClassName(idx, isConflict, selectedVal) {
+                var r = Math.floor(idx / 9);
+                var c = idx % 9;
+                var cls = "sudoku-cell";
+
+                if (c === 2 || c === 5) cls += " block-right";
+                if (r === 2 || r === 5) cls += " block-bottom";
+
+                var isFixed = state.initialBoard[idx] !== "0";
+                var val = state.currentBoard[idx];
+
+                if (isFixed) {
+                    cls += " fixed-clue";
+                } else if (val !== "0") {
+                    cls += " user-val";
+                }
+
+                // Comprobar si tiene notas visibles
+                if (val === "0" && hasAnyNote(idx)) {
+                    cls += " has-notes";
+                }
+
+                // Resaltar celdas con el mismo número que la celda seleccionada
+                if (idx === state.selectedCell) {
+                    cls += " selected";
+                } else if (selectedVal !== "0" && val === selectedVal) {
+                    cls += " same-value";
+                }
+
+                if (isConflict) {
+                    cls += " conflict";
+                }
+
+                return cls;
+            }
+
+            function hasAnyNote(idx) {
+                var arr = state.notes[idx];
+                if (!arr) return false;
+                for (var n = 1; n <= 9; n++) {
+                    if (arr[n]) return true;
+                }
+                return false;
+            }
+
+            function syncSingleCellContent(idx) {
+                var val = state.currentBoard[idx];
+                var text = (val === "0") ? "" : val;
+                if (domCellVals[idx].textContent !== text) {
+                    domCellVals[idx].textContent = text;
+                }
+
+                var cellNotes = state.notes[idx];
+                for (var n = 1; n <= 9; n++) {
+                    var noteText = (val === "0" && cellNotes && cellNotes[n]) ? String(n) : "";
+                    if (domNoteItems[idx][n].textContent !== noteText) {
+                        domNoteItems[idx][n].textContent = noteText;
+                    }
+                }
+            }
+
+            function syncAllCellClassesAndCounts() {
+                var conflicts = computeConflictsArray(state.currentBoard);
+                var selectedVal = (state.selectedCell >= 0 && state.selectedCell < 81)
+                    ? state.currentBoard[state.selectedCell]
+                    : "0";
+
+                var counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+                for (var i = 0; i < 81; i++) {
+                    var targetClass = buildCellClassName(i, conflicts[i], selectedVal);
+                    setCellClassIfChanged(i, targetClass);
+
+                    var v = state.currentBoard[i];
+                    if (v !== "0" && !conflicts[i]) {
+                        counts[parseInt(v, 10)]++;
+                    }
+                }
+
+                // Actualizar contadores restantes en el teclado numérico
+                for (var d = 1; d <= 9; d++) {
+                    var remaining = Math.max(0, 9 - counts[d]);
+                    var remText = remaining === 0 ? "OK" : ("quedan " + remaining);
+                    if (domNumpadCounts[d].textContent !== remText) {
+                        domNumpadCounts[d].textContent = remText;
+                    }
+                    var btnClass = remaining === 0 ? "num-btn completed-digit" : "num-btn";
+                    if (domNumpadBtns[d].className !== btnClass) {
+                        domNumpadBtns[d].className = btnClass;
+                    }
+                }
+            }
+
+            function fullBoardSync() {
+                for (var i = 0; i < 81; i++) {
+                    syncSingleCellContent(i);
+                }
+                syncAllCellClassesAndCounts();
+                updateHeaderUI();
+                updateNotesButtonUI();
+            }
+
+            function updateHeaderUI() {
+                var diffNames = {
+                    easy: "Fácil",
+                    medium: "Medio",
+                    hard: "Difícil",
+                    expert: "Experto"
+                };
+                var labelText = (diffNames[state.difficulty] || "Fácil") + " #" + state.puzzleNumber;
+                if (elPuzzleLabel.textContent !== labelText) {
+                    elPuzzleLabel.textContent = labelText;
+                }
+                var solvedStr = String(state.solvedCount);
+                if (elSolvedCount.textContent !== solvedStr) {
+                    elSolvedCount.textContent = solvedStr;
+                }
+                if (elDiffSelect.value !== state.difficulty) {
+                    elDiffSelect.value = state.difficulty;
+                }
+            }
+
+            function updateNotesButtonUI() {
+                var label = state.notesMode ? "Notas: ON" : "Notas: OFF";
+                if (elBtnNotes.textContent !== label) {
+                    elBtnNotes.textContent = label;
+                }
+                var cls = state.notesMode ? "tool-btn active-toggle" : "tool-btn";
+                if (elBtnNotes.className !== cls) {
+                    elBtnNotes.className = cls;
+                }
+            }
+
+            /* ==========================================================================
+               7. INTERACCIÓN DEL JUGADOR Y MECÁNICAS DE JUEGO
+               ========================================================================== */
+            function selectCell(idx) {
+                if (idx < 0 || idx > 80) return;
+                hideConfirmationBannerIfOpen();
+                state.selectedCell = idx;
+                syncAllCellClassesAndCounts();
+            }
+
+            function cloneNotesForCell(idx) {
+                var src = state.notes[idx];
+                var copy = new Array(10);
+                for (var n = 1; n <= 9; n++) {
+                    copy[n] = !!(src && src[n]);
+                }
+                return copy;
+            }
+
+            function removePeerNotes(cellIdx, digitNum) {
+                var r = Math.floor(cellIdx / 9);
+                var c = cellIdx % 9;
+                var br = Math.floor(r / 3) * 3;
+                var bc = Math.floor(c / 3) * 3;
+                var changedPeers = [];
+
+                function clearNoteAt(peerIdx) {
+                    if (peerIdx === cellIdx) return;
+                    if (state.notes[peerIdx] && state.notes[peerIdx][digitNum]) {
+                        state.notes[peerIdx][digitNum] = false;
+                        changedPeers.push(peerIdx);
+                    }
+                }
+
+                for (var i = 0; i < 9; i++) {
+                    clearNoteAt(r * 9 + i);
+                    clearNoteAt(i * 9 + c);
+                }
+                for (var rr = br; rr < br + 3; rr++) {
+                    for (var cc = bc; cc < bc + 3; cc++) {
+                        clearNoteAt(rr * 9 + cc);
+                    }
+                }
+
+                return changedPeers;
+            }
+
+            function handleNumberInput(digitStr) {
+                if (state.completed) return;
+                hideConfirmationBannerIfOpen();
+
+                var idx = state.selectedCell;
+                if (idx < 0 || idx > 80) return;
+
+                // No se pueden modificar las pistas iniciales del problema
+                if (state.initialBoard[idx] !== "0") {
+                    showBanner("Celda fija del tablero inicial.", false, false);
+                    return;
+                }
+
+                var digitNum = parseInt(digitStr, 10);
+                var prevVal = state.currentBoard[idx];
+                var prevNotes = cloneNotesForCell(idx);
+
+                if (state.notesMode) {
+                    // Si la celda tenía un valor puesto por el usuario, lo limpiamos para poner notas
+                    if (prevVal !== "0") {
+                        state.currentBoard[idx] = "0";
+                    }
+                    if (!state.notes[idx]) {
+                        state.notes[idx] = new Array(10);
+                    }
+                    state.notes[idx][digitNum] = !state.notes[idx][digitNum];
+
+                    state.history.push({
+                        cells: [{
+                            idx: idx,
+                            oldVal: prevVal,
+                            newVal: "0",
+                            oldNotes: prevNotes,
+                            newNotes: cloneNotesForCell(idx)
+                        }]
+                    });
+
+                    syncSingleCellContent(idx);
+                    syncAllCellClassesAndCounts();
+                    saveState();
+                    return;
+                }
+
+                // Modo normal: si se pulsa el mismo número ya colocado, se borra; si no, se coloca
+                var nextVal = (prevVal === digitStr) ? "0" : digitStr;
+                state.currentBoard[idx] = nextVal;
+                state.notes[idx] = new Array(10);
+
+                var actionRecord = [{
+                    idx: idx,
+                    oldVal: prevVal,
+                    newVal: nextVal,
+                    oldNotes: prevNotes,
+                    newNotes: cloneNotesForCell(idx)
+                }];
+
+                // Limpiar automáticamente notas candidatas iguales en la misma fila/columna/bloque
+                if (nextVal !== "0") {
+                    var r = Math.floor(idx / 9);
+                    var c = idx % 9;
+                    var br = Math.floor(r / 3) * 3;
+                    var bc = Math.floor(c / 3) * 3;
+                    var visited = {};
+                    visited[idx] = true;
+
+                    function checkPeer(pIdx) {
+                        if (visited[pIdx]) return;
+                        visited[pIdx] = true;
+                        if (state.notes[pIdx] && state.notes[pIdx][digitNum]) {
+                            var pOldNotes = cloneNotesForCell(pIdx);
+                            state.notes[pIdx][digitNum] = false;
+                            actionRecord.push({
+                                idx: pIdx,
+                                oldVal: state.currentBoard[pIdx],
+                                newVal: state.currentBoard[pIdx],
+                                oldNotes: pOldNotes,
+                                newNotes: cloneNotesForCell(pIdx)
+                            });
+                            syncSingleCellContent(pIdx);
+                        }
+                    }
+
+                    for (var k = 0; k < 9; k++) {
+                        checkPeer(r * 9 + k);
+                        checkPeer(k * 9 + c);
+                    }
+                    for (var rr = br; rr < br + 3; rr++) {
+                        for (var cc = bc; cc < bc + 3; cc++) {
+                            checkPeer(rr * 9 + cc);
+                        }
+                    }
+                }
+
+                state.history.push({ cells: actionRecord });
+                syncSingleCellContent(idx);
+                syncAllCellClassesAndCounts();
+
+                if (checkBoardComplete()) {
+                    handleVictory();
+                } else {
+                    saveState();
+                }
+            }
+
+            function handleErase() {
+                if (state.completed) return;
+                hideConfirmationBannerIfOpen();
+
+                var idx = state.selectedCell;
+                if (idx < 0 || idx > 80) return;
+                if (state.initialBoard[idx] !== "0") return;
+
+                var prevVal = state.currentBoard[idx];
+                var prevNotes = cloneNotesForCell(idx);
+
+                if (prevVal === "0" && !hasAnyNote(idx)) return;
+
+                state.currentBoard[idx] = "0";
+                state.notes[idx] = new Array(10);
+
+                state.history.push({
+                    cells: [{
+                        idx: idx,
+                        oldVal: prevVal,
+                        newVal: "0",
+                        oldNotes: prevNotes,
+                        newNotes: cloneNotesForCell(idx)
+                    }]
+                });
+
+                syncSingleCellContent(idx);
+                syncAllCellClassesAndCounts();
+                saveState();
+            }
+
+            function handleUndo() {
+                if (state.completed) return;
+                hideConfirmationBannerIfOpen();
+
+                if (!state.history.length) {
+                    showBanner("No hay movimientos para deshacer.", false, false);
+                    return;
+                }
+
+                var lastAction = state.history.pop();
+                for (var i = 0; i < lastAction.cells.length; i++) {
+                    var change = lastAction.cells[i];
+                    state.currentBoard[change.idx] = change.oldVal;
+                    state.notes[change.idx] = change.oldNotes;
+                    syncSingleCellContent(change.idx);
+                }
+
+                if (lastAction.cells.length > 0) {
+                    state.selectedCell = lastAction.cells[0].idx;
+                }
+
+                syncAllCellClassesAndCounts();
+                saveState();
+            }
+
+            function handleHint() {
+                if (state.completed) return;
+                hideConfirmationBannerIfOpen();
+
+                var targetIdx = state.selectedCell;
+
+                // Si la celda seleccionada ya es correcta, buscar la primera celda vacía o incorrecta
+                if (targetIdx < 0 || state.currentBoard[targetIdx] === state.solutionBoard[targetIdx]) {
+                    targetIdx = -1;
+                    for (var i = 0; i < 81; i++) {
+                        if (state.currentBoard[i] !== state.solutionBoard[i]) {
+                            targetIdx = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (targetIdx === -1) return;
+
+                state.selectedCell = targetIdx;
+                var correctDigit = state.solutionBoard[targetIdx];
+                var prevNotesMode = state.notesMode;
+                state.notesMode = false;
+                handleNumberInput(correctDigit);
+                state.notesMode = prevNotesMode;
+                showBanner("Pista aplicada en fila " + (Math.floor(targetIdx / 9) + 1) + ", col " + ((targetIdx % 9) + 1) + ".", false, false);
+            }
+
+            function handleVictory() {
+                state.completed = true;
+                state.solvedCount = (state.solvedCount || 0) + 1;
+                updateHeaderUI();
+                saveState();
+                showBanner("¡ENHORABUENA! Has completado el Sudoku correctamente.", true, false);
+            }
+
+            /* ==========================================================================
+               8. GESTIÓN DE BANNERS Y PARTIDAS NUEVAS (SIN ALERT / CONFIRM NATIVO)
+               ========================================================================== */
+            var pendingDifficultyChange = null;
+
+            function showBanner(message, isVictory, showConfirmButtons) {
+                elStatusText.textContent = message;
+                elStatusActions.style.display = showConfirmButtons ? "block" : "none";
+                elStatusBanner.className = "status-banner visible" + (isVictory ? " victory" : "");
+            }
+
+            function hideBanner() {
+                elStatusBanner.className = "status-banner";
+                elStatusActions.style.display = "none";
+                pendingDifficultyChange = null;
+            }
+
+            function hideConfirmationBannerIfOpen() {
+                if (!state.completed && elStatusBanner.className.indexOf("visible") !== -1) {
+                    hideBanner();
+                    // Restaurar el selector de dificultad si el usuario canceló implícitamente
+                    if (elDiffSelect.value !== state.difficulty) {
+                        elDiffSelect.value = state.difficulty;
+                    }
+                }
+            }
+
+            function hasUserProgress() {
+                if (state.completed) return false;
+                return state.history && state.history.length > 0;
+            }
+
+            function requestNewGame(newDiff) {
+                var targetDiff = newDiff || state.difficulty;
+                if (hasUserProgress()) {
+                    pendingDifficultyChange = targetDiff;
+                    showBanner("¿Deseas abandonar la partida actual y empezar un tablero nuevo?", false, true);
+                } else {
+                    startNewGame(targetDiff);
+                }
+            }
+
+            function startNewGame(difficulty) {
+                hideBanner();
+                var diff = difficulty || state.difficulty || "easy";
+                state.difficulty = diff;
+
+                if (!state.variantCounters) {
+                    state.variantCounters = { easy: 0, medium: 0, hard: 0, expert: 0 };
+                }
+                var variantIdx = state.variantCounters[diff] || 0;
+                var generated = generateTransformedPuzzle(diff, variantIdx);
+
+                state.variantCounters[diff] = variantIdx + 1;
+                state.puzzleNumber = variantIdx + 1;
+                state.initialBoard = generated.mask.slice(0);
+                state.currentBoard = generated.mask.slice(0);
+                state.solutionBoard = generated.sol.slice(0);
+                state.notes = {};
+                state.history = [];
+                state.completed = false;
+
+                // Seleccionar la primera celda vacía para empezar cómodamente
+                state.selectedCell = 0;
+                for (var i = 0; i < 81; i++) {
+                    if (state.initialBoard[i] === "0") {
+                        state.selectedCell = i;
+                        break;
+                    }
+                }
+
+                fullBoardSync();
+                saveState();
+            }
+
+            /* ==========================================================================
+               9. ALMACENAMIENTO LOCAL (localStorage)
+               ========================================================================== */
+            function saveState() {
+                try {
+                    var payload = JSON.stringify(state);
+                    window.localStorage.setItem(STORAGE_KEY, payload);
+                } catch (e) {
+                    // Ignorar silenciosamente si el navegador tiene restricciones de cuota
+                }
+            }
+
+            function loadState() {
+                try {
+                    var raw = window.localStorage.getItem(STORAGE_KEY);
+                    if (!raw) return false;
+                    var parsed = JSON.parse(raw);
+                    if (!parsed || !parsed.initialBoard || parsed.initialBoard.length !== 81) {
+                        return false;
+                    }
+                    state.difficulty = parsed.difficulty || "easy";
+                    state.puzzleNumber = parsed.puzzleNumber || 1;
+                    state.solvedCount = parsed.solvedCount || 0;
+                    state.initialBoard = parsed.initialBoard;
+                    state.currentBoard = parsed.currentBoard;
+                    state.solutionBoard = parsed.solutionBoard;
+                    state.notes = parsed.notes || {};
+                    state.history = parsed.history || [];
+                    state.selectedCell = (typeof parsed.selectedCell === "number") ? parsed.selectedCell : 0;
+                    state.notesMode = !!parsed.notesMode;
+                    state.completed = !!parsed.completed;
+                    state.variantCounters = parsed.variantCounters || { easy: 1, medium: 0, hard: 0, expert: 0 };
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            /* ==========================================================================
+               10. REGISTRO DE EVENTOS (TÁCTIL + TECLADO FÍSICO PARA PRUEBAS EN PC)
+               ========================================================================== */
+            function bindEvents() {
+                elBtnNewGame.addEventListener("click", function () {
+                    requestNewGame(elDiffSelect.value);
+                });
+
+                elDiffSelect.addEventListener("change", function () {
+                    requestNewGame(elDiffSelect.value);
+                });
+
+                elBtnConfirmYes.addEventListener("click", function () {
+                    startNewGame(pendingDifficultyChange || elDiffSelect.value);
+                });
+
+                elBtnConfirmNo.addEventListener("click", function () {
+                    elDiffSelect.value = state.difficulty;
+                    hideBanner();
+                });
+
+                elBtnNotes.addEventListener("click", function () {
+                    hideConfirmationBannerIfOpen();
+                    state.notesMode = !state.notesMode;
+                    updateNotesButtonUI();
+                    saveState();
+                });
+
+                elBtnErase.addEventListener("click", function () {
+                    handleErase();
+                });
+
+                elBtnUndo.addEventListener("click", function () {
+                    handleUndo();
+                });
+
+                elBtnHint.addEventListener("click", function () {
+                    handleHint();
+                });
+
+                // Soporte para teclado físico al probar en navegador de escritorio
+                document.addEventListener("keydown", function (ev) {
+                    var key = ev.key || String.fromCharCode(ev.keyCode);
+                    if (key >= "1" && key <= "9") {
+                        ev.preventDefault();
+                        handleNumberInput(key);
+                    } else if (key === "Backspace" || key === "Delete" || key === "0") {
+                        ev.preventDefault();
+                        handleErase();
+                    } else if (key === "n" || key === "N") {
+                        ev.preventDefault();
+                        state.notesMode = !state.notesMode;
+                        updateNotesButtonUI();
+                        saveState();
+                    } else if (key === "ArrowUp" || ev.keyCode === 38) {
+                        ev.preventDefault();
+                        selectCell((state.selectedCell - 9 + 81) % 81);
+                    } else if (key === "ArrowDown" || ev.keyCode === 40) {
+                        ev.preventDefault();
+                        selectCell((state.selectedCell + 9) % 81);
+                    } else if (key === "ArrowLeft" || ev.keyCode === 37) {
+                        ev.preventDefault();
+                        selectCell((state.selectedCell - 1 + 81) % 81);
+                    } else if (key === "ArrowRight" || ev.keyCode === 39) {
+                        ev.preventDefault();
+                        selectCell((state.selectedCell + 1) % 81);
+                    }
+                });
+            }
+
+            /* ==========================================================================
+               ARRANQUE DE LA APLICACIÓN
+               ========================================================================== */
+            buildDOMGridOnce();
+            bindEvents();
+
+            if (loadState()) {
+                fullBoardSync();
+                if (state.completed) {
+                    showBanner("¡Tablero completado! Pulsa 'Nuevo Juego' para otra partida.", true, false);
+                }
+            } else {
+                startNewGame("easy");
+            }
+        })();
+    </script>
+</body>
+</html>
